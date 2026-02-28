@@ -1,10 +1,6 @@
-const puppeteer = require('puppeteer-core');
+const puppeteer = require('puppeteer');
 const path = require('path');
 const fs = require('fs');
-
-// Use Playwright's cached Chromium binary
-const CHROMIUM_PATH = process.env.CHROMIUM_PATH ||
-  path.join(process.env.HOME || '/root', '.cache/ms-playwright/chromium-1194/chrome-linux/chrome');
 
 async function htmlToImage(html, options = {}) {
   const {
@@ -16,7 +12,6 @@ async function htmlToImage(html, options = {}) {
   } = options;
 
   const browser = await puppeteer.launch({
-    executablePath: CHROMIUM_PATH,
     headless: true,
     args: [
       '--no-sandbox',
