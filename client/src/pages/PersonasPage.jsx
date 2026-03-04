@@ -141,6 +141,22 @@ function UploadPanel({ onParsed }) {
   );
 }
 
+// ─── Collapsible section ──────────────────────────────────────────────────────
+function PersonaSection({ sectionKey, label, count, open, setOpen, children }) {
+  return (
+    <div className="border-t border-zinc-800 pt-4">
+      <button onClick={() => setOpen(p => ({ ...p, [sectionKey]: !p[sectionKey] }))} className="w-full flex items-center justify-between py-1 mb-2">
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider">{label}</span>
+          {count !== undefined && <span className="text-[9px] text-zinc-600 bg-zinc-800 px-1.5 py-0.5 rounded-full">{count}</span>}
+        </div>
+        {open[sectionKey] ? <ChevronUp size={13} className="text-zinc-600" /> : <ChevronDown size={13} className="text-zinc-600" />}
+      </button>
+      {open[sectionKey] && children}
+    </div>
+  );
+}
+
 // ─── Persona editor ───────────────────────────────────────────────────────────
 function PersonaEditor({ persona, onSave, onCancel, isNew }) {
   const [data, setData] = useState(persona);
@@ -163,19 +179,6 @@ function PersonaEditor({ persona, onSave, onCancel, isNew }) {
     setSaving(true);
     try { await onSave(data); } finally { setSaving(false); }
   };
-
-  const Section = ({ k, label, count, children }) => (
-    <div className="border-t border-zinc-800 pt-4">
-      <button onClick={() => setOpen(p => ({ ...p, [k]: !p[k] }))} className="w-full flex items-center justify-between py-1 mb-2">
-        <div className="flex items-center gap-2">
-          <span className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider">{label}</span>
-          {count !== undefined && <span className="text-[9px] text-zinc-600 bg-zinc-800 px-1.5 py-0.5 rounded-full">{count}</span>}
-        </div>
-        {open[k] ? <ChevronUp size={13} className="text-zinc-600" /> : <ChevronDown size={13} className="text-zinc-600" />}
-      </button>
-      {open[k] && children}
-    </div>
-  );
 
   return (
     <div className="flex flex-col h-full">
@@ -252,7 +255,7 @@ function PersonaEditor({ persona, onSave, onCancel, isNew }) {
         </div>
 
         {/* Pain points */}
-        <Section k="pain_points" label="Pain points" count={data.pain_points?.length}>
+        <PersonaSection sectionKey="pain_points" label="Pain points" count={data.pain_points?.length} open={open} setOpen={setOpen}>
           <div className="space-y-2">
             {(data.pain_points || []).map((pp, i) => (
               <div key={i} className="flex items-start gap-2 group">
@@ -276,10 +279,10 @@ function PersonaEditor({ persona, onSave, onCancel, isNew }) {
               <Plus size={12} /> Ajouter un pain point
             </button>
           </div>
-        </Section>
+        </PersonaSection>
 
         {/* Verbatims */}
-        <Section k="verbatims" label="Verbatims" count={data.verbatims?.length}>
+        <PersonaSection sectionKey="verbatims" label="Verbatims" count={data.verbatims?.length} open={open} setOpen={setOpen}>
           <div className="space-y-2">
             {(data.verbatims || []).map((v, i) => (
               <div key={i} className="flex items-start gap-1.5 group">
@@ -296,10 +299,10 @@ function PersonaEditor({ persona, onSave, onCancel, isNew }) {
               <Plus size={12} /> Ajouter un verbatim
             </button>
           </div>
-        </Section>
+        </PersonaSection>
 
         {/* Objections */}
-        <Section k="objections" label="Objections & réponses" count={data.objections?.length}>
+        <PersonaSection sectionKey="objections" label="Objections & réponses" count={data.objections?.length} open={open} setOpen={setOpen}>
           <div className="space-y-3">
             {(data.objections || []).map((obj, i) => (
               <div key={i} className="bg-zinc-800/30 border border-zinc-800 rounded-lg p-3 group">
@@ -316,10 +319,10 @@ function PersonaEditor({ persona, onSave, onCancel, isNew }) {
               <Plus size={12}/> Ajouter une objection
             </button>
           </div>
-        </Section>
+        </PersonaSection>
 
         {/* Motivations & Triggers */}
-        <Section k="motivations" label="Motivations & déclencheurs" count={(data.motivations?.length||0)+(data.triggers?.length||0)}>
+        <PersonaSection sectionKey="motivations" label="Motivations & déclencheurs" count={(data.motivations?.length||0)+(data.triggers?.length||0)} open={open} setOpen={setOpen}>
           <div className="space-y-4">
             {[
               { key: 'motivations', label: 'Motivations d\'achat', color: 'bg-emerald-500' },
@@ -340,14 +343,14 @@ function PersonaEditor({ persona, onSave, onCancel, isNew }) {
               </div>
             ))}
           </div>
-        </Section>
+        </PersonaSection>
 
         {/* Tone */}
-        <Section k="tone" label="Ton de communication">
+        <PersonaSection sectionKey="tone" label="Ton de communication" open={open} setOpen={setOpen}>
           <div className="space-y-3">
             <textarea value={data.tone||''} onChange={e=>update('tone',e.target.value)} placeholder="Ex: Émotionnel et bienveillant, pas trop scientifique..." className="w-full bg-zinc-800/40 border border-zinc-800 hover:border-zinc-700 focus:border-indigo-500 rounded-lg px-3 py-2 text-xs text-zinc-300 focus:outline-none resize-none transition-colors" rows={2}/>
           </div>
-        </Section>
+        </PersonaSection>
 
       </div>
     </div>

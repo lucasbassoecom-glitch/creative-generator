@@ -212,6 +212,22 @@ function StarRating({ value, onChange }) {
   );
 }
 
+// ─── Collapsible section ──────────────────────────────────────────────────────
+function ProductSection({ sectionKey, label, icon: Icon, open, setOpen, children }) {
+  return (
+    <div className="border-t border-zinc-800 pt-4">
+      <button onClick={() => setOpen(p => ({ ...p, [sectionKey]: !p[sectionKey] }))} className="w-full flex items-center justify-between py-1 mb-2">
+        <div className="flex items-center gap-2">
+          {Icon && <Icon size={13} className="text-zinc-500" />}
+          <span className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider">{label}</span>
+        </div>
+        {open[sectionKey] ? <ChevronUp size={13} className="text-zinc-600" /> : <ChevronDown size={13} className="text-zinc-600" />}
+      </button>
+      {open[sectionKey] && children}
+    </div>
+  );
+}
+
 // ─── Product editor ───────────────────────────────────────────────────────────
 function ProductEditor({ product, onSave, onCancel, isNew }) {
   const [data, setData] = useState(product);
@@ -226,19 +242,6 @@ function ProductEditor({ product, onSave, onCancel, isNew }) {
     setSaving(true);
     try { await onSave(data); } finally { setSaving(false); }
   };
-
-  const Section = ({ k, label, icon: Icon, children }) => (
-    <div className="border-t border-zinc-800 pt-4">
-      <button onClick={() => setOpen(p => ({ ...p, [k]: !p[k] }))} className="w-full flex items-center justify-between py-1 mb-2">
-        <div className="flex items-center gap-2">
-          {Icon && <Icon size={13} className="text-zinc-500" />}
-          <span className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider">{label}</span>
-        </div>
-        {open[k] ? <ChevronUp size={13} className="text-zinc-600" /> : <ChevronDown size={13} className="text-zinc-600" />}
-      </button>
-      {open[k] && children}
-    </div>
-  );
 
   return (
     <div className="flex flex-col h-full">
@@ -290,7 +293,7 @@ function ProductEditor({ product, onSave, onCancel, isNew }) {
         </div>
 
         {/* Pricing */}
-        <Section k="pricing" label="Prix & offre" icon={Tag}>
+        <ProductSection sectionKey="pricing" label="Prix & offre" icon={Tag} open={open} setOpen={setOpen}>
           <div className="space-y-3">
             <div className="grid grid-cols-2 gap-3">
               <div>
@@ -321,30 +324,30 @@ function ProductEditor({ product, onSave, onCancel, isNew }) {
               <input value={data.offer || ''} onChange={e => update('offer', e.target.value)} placeholder="Ex: -30% + livraison gratuite, Lot 3 pour 2..." className="w-full bg-zinc-800/40 border border-zinc-800 hover:border-zinc-700 focus:border-indigo-500 rounded-lg px-3 py-2 text-sm text-zinc-300 focus:outline-none transition-colors" />
             </div>
           </div>
-        </Section>
+        </ProductSection>
 
         {/* Benefits */}
-        <Section k="benefits" label="Bénéfices principaux" icon={BarChart2}>
+        <ProductSection sectionKey="benefits" label="Bénéfices principaux" icon={BarChart2} open={open} setOpen={setOpen}>
           <SortableList
             items={data.benefits || []}
             onChange={v => update('benefits', v)}
             placeholder="Ex: Réduit la fatigue en 7 jours"
             color="bg-emerald-500"
           />
-        </Section>
+        </ProductSection>
 
         {/* USPs */}
-        <Section k="usps" label="USPs (arguments uniques)" icon={Award}>
+        <ProductSection sectionKey="usps" label="USPs (arguments uniques)" icon={Award} open={open} setOpen={setOpen}>
           <SortableList
             items={data.usps || []}
             onChange={v => update('usps', v)}
             placeholder="Ex: Formule brevetée 100% naturelle"
             color="bg-blue-500"
           />
-        </Section>
+        </ProductSection>
 
         {/* Certifications */}
-        <Section k="certifications" label="Certifications & labels">
+        <ProductSection sectionKey="certifications" label="Certifications & labels" open={open} setOpen={setOpen}>
           <div className="space-y-2">
             <div className="flex flex-wrap gap-2 mb-2">
               {['Bio', 'Vegan', 'Made in France', 'Sans gluten', 'Sans lactose', 'GMP', 'Halal', 'Kosher'].map(cert => (
@@ -376,10 +379,10 @@ function ProductEditor({ product, onSave, onCancel, isNew }) {
               }}
             />
           </div>
-        </Section>
+        </ProductSection>
 
         {/* Reviews */}
-        <Section k="reviews" label="Avis & évaluations" icon={Star}>
+        <ProductSection sectionKey="reviews" label="Avis & évaluations" icon={Star} open={open} setOpen={setOpen}>
           <div className="space-y-3">
             <div>
               <label className="text-[10px] text-zinc-500 block mb-2">Note moyenne</label>
@@ -399,7 +402,7 @@ function ProductEditor({ product, onSave, onCancel, isNew }) {
               </div>
             </div>
           </div>
-        </Section>
+        </ProductSection>
 
         {/* Gallery */}
         <div className="border-t border-zinc-800 pt-4">
