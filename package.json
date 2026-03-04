@@ -10,6 +10,9 @@
     "start:server": "npm start --prefix server",
     "start:client": "npm run dev --prefix client"
   },
+  "engines": {
+    "node": ">=20"
+  },
   "devDependencies": {
     "concurrently": "^8.2.2"
   }
