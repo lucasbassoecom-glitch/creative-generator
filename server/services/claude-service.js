@@ -56,6 +56,30 @@ async function analyzeImage(base64Image, mediaType, prompt, options = {}) {
 }
 
 /**
+ * Send text + optional images to Claude (multi-modal)
+ */
+async function chatWithImages(systemPrompt, userText, images = [], options = {}) {
+  const client = getClient();
+  const { maxTokens = 4096 } = options;
+
+  const content = [
+    ...images.map(img => ({
+      type: 'image',
+      source: { type: 'base64', media_type: img.mediaType, data: img.base64 },
+    })),
+    { type: 'text', text: userText },
+  ];
+
+  const response = await client.messages.create({
+    model: MODEL,
+    max_tokens: maxTokens,
+    system: systemPrompt,
+    messages: [{ role: 'user', content }],
+  });
+  return response.content[0].text;
+}
+
+/**
  * Parse JSON from Claude's response (handles markdown code blocks)
  */
 function parseJSON(text) {
@@ -71,4 +95,4 @@ function parseJSON(text) {
   }
 }
 
-module.exports = { chat, analyzeImage, parseJSON, MODEL };
+module.exports = { chat, analyzeImage, chatWithImages, parseJSON, MODEL };

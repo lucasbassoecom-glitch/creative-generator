@@ -11,6 +11,7 @@ import {
   AlertCircle,
   Loader,
   LayoutTemplate,
+  Wand2,
 } from 'lucide-react';
 import FormatBadge from './FormatBadge';
 import { usePersona } from '../../context/PersonaContext';
@@ -23,7 +24,8 @@ const NAV_ITEMS = [
   { id: 'personas', label: 'Personas', icon: Users, group: 'create' },
   { id: 'products', label: 'Produits', icon: Package, group: 'create' },
   { id: 'templates', label: 'Templates concurrents', icon: ScanSearch, group: 'create' },
-  { id: 'generator', label: 'Générateur', icon: Sparkles, group: 'create', accent: true },
+  { id: 'generator', label: 'Générateur HTML/CSS', icon: Sparkles, group: 'create', accent: true },
+  { id: 'ai-creator', label: 'Création IA (GPT)', icon: Wand2, group: 'create', accentAi: true },
   { id: 'separator2', type: 'separator', label: 'GESTION', group: 'manage' },
   { id: 'library', label: 'Bibliothèque', icon: BookImage, group: 'manage' },
   { id: 'batch', label: 'Batch & Export', icon: Layers, group: 'manage' },
@@ -112,13 +114,15 @@ export default function Sidebar({ currentPage, onNavigate, apiStatus }) {
                 isActive
                   ? item.accent
                     ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/40'
+                    : item.accentAi
+                    ? 'bg-gradient-to-r from-violet-700 to-indigo-700 text-white shadow-lg shadow-violet-900/40'
                     : 'bg-zinc-800 text-zinc-100'
                   : 'text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/60'
               }`}
             >
               <Icon
                 size={16}
-                className={isActive ? (item.accent ? 'text-white' : 'text-indigo-400') : 'text-zinc-500 group-hover:text-zinc-300'}
+                className={isActive ? (item.accent || item.accentAi ? 'text-white' : 'text-indigo-400') : 'text-zinc-500 group-hover:text-zinc-300'}
               />
               {item.label}
             </button>

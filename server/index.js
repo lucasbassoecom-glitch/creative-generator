@@ -28,6 +28,7 @@ app.use('/api/creatives', require('./routes/creatives'));
 app.use('/api/claude', require('./routes/claude'));
 app.use('/api/export', require('./routes/export'));
 app.use('/api/upload', require('./routes/upload'));
+app.use('/api/gpt-images', require('./routes/gpt-images'));
 
 // Health check
 app.get('/api/health', (req, res) => {
@@ -51,5 +52,7 @@ app.listen(PORT, () => {
   console.log(`\n🚀 Creative Generator Server running on http://localhost:${PORT}`);
   console.log(`📁 Data stored in: ${dataDir}`);
   const hasKey = process.env.ANTHROPIC_API_KEY && process.env.ANTHROPIC_API_KEY !== 'your_anthropic_api_key_here';
-  console.log(`🔑 Anthropic API key: ${hasKey ? '✅ configured' : '❌ missing — add to .env'}\n`);
+  const hasOpenAI = process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY !== 'your_openai_api_key_here';
+  console.log(`🔑 Anthropic API key: ${hasKey ? '✅ configured' : '❌ missing — add to .env'}`);
+  console.log(`🔑 OpenAI API key:    ${hasOpenAI ? '✅ configured' : '❌ missing — add to .env (required for Mode Création IA)'}\n`);
 });

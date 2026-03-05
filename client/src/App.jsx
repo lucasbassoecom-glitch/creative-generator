@@ -12,6 +12,7 @@ import GeneratorPage from './pages/GeneratorPage';
 import LibraryPage from './pages/LibraryPage';
 import BatchPage from './pages/BatchPage';
 import FormatPage from './pages/FormatPage';
+import AICreatorPage from './pages/AICreatorPage';
 
 const PAGES = {
   dashboard: Dashboard,
@@ -22,6 +23,7 @@ const PAGES = {
   library: LibraryPage,
   batch: BatchPage,
   formats: FormatPage,
+  'ai-creator': AICreatorPage,
 };
 
 export default function App() {
