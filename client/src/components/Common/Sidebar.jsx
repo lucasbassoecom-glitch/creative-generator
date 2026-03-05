@@ -12,6 +12,8 @@ import {
   Loader,
   LayoutTemplate,
   Wand2,
+  RefreshCw,
+  BarChart2,
 } from 'lucide-react';
 import FormatBadge from './FormatBadge';
 import { usePersona } from '../../context/PersonaContext';
@@ -19,15 +21,19 @@ import { useProduct } from '../../context/ProductContext';
 
 const NAV_ITEMS = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, group: 'main' },
+  { id: 'separator0', type: 'separator', label: 'ACTIONS', group: 'actions' },
+  { id: 'ai-creator', label: 'Nouvelle créative', icon: Wand2, group: 'actions', accentAi: true, kbd: 'N' },
+  { id: 'iterate', label: 'Itérer sur un winner', icon: RefreshCw, group: 'actions', accentIterate: true, kbd: 'I' },
+  { id: 'quick-session', label: 'Session rapide', icon: Zap, group: 'actions', accentQuick: true, kbd: 'S' },
   { id: 'separator1', type: 'separator', label: 'CRÉATION', group: 'create' },
   { id: 'formats', label: 'Formats', icon: LayoutTemplate, group: 'create' },
   { id: 'personas', label: 'Personas', icon: Users, group: 'create' },
   { id: 'products', label: 'Produits', icon: Package, group: 'create' },
   { id: 'templates', label: 'Templates concurrents', icon: ScanSearch, group: 'create' },
   { id: 'generator', label: 'Générateur HTML/CSS', icon: Sparkles, group: 'create', accent: true },
-  { id: 'ai-creator', label: 'Création IA (GPT)', icon: Wand2, group: 'create', accentAi: true },
   { id: 'separator2', type: 'separator', label: 'GESTION', group: 'manage' },
   { id: 'library', label: 'Bibliothèque', icon: BookImage, group: 'manage' },
+  { id: 'analytics', label: 'Analytics', icon: BarChart2, group: 'manage', kbd: 'A' },
   { id: 'batch', label: 'Batch & Export', icon: Layers, group: 'manage' },
 ];
 
@@ -116,15 +122,26 @@ export default function Sidebar({ currentPage, onNavigate, apiStatus }) {
                     ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/40'
                     : item.accentAi
                     ? 'bg-gradient-to-r from-violet-700 to-indigo-700 text-white shadow-lg shadow-violet-900/40'
+                    : item.accentIterate
+                    ? 'bg-violet-900/60 border border-violet-500/40 text-violet-200'
+                    : item.accentQuick
+                    ? 'bg-amber-900/50 border border-amber-500/30 text-amber-200'
                     : 'bg-zinc-800 text-zinc-100'
+                  : item.accentIterate
+                  ? 'text-violet-400 hover:text-violet-200 hover:bg-violet-900/30'
+                  : item.accentQuick
+                  ? 'text-amber-400 hover:text-amber-200 hover:bg-amber-900/20'
                   : 'text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/60'
               }`}
             >
               <Icon
                 size={16}
-                className={isActive ? (item.accent || item.accentAi ? 'text-white' : 'text-indigo-400') : 'text-zinc-500 group-hover:text-zinc-300'}
+                className={isActive ? (item.accent || item.accentAi ? 'text-white' : item.accentIterate ? 'text-violet-300' : item.accentQuick ? 'text-amber-300' : 'text-indigo-400') : item.accentIterate ? 'text-violet-500 group-hover:text-violet-300' : item.accentQuick ? 'text-amber-500 group-hover:text-amber-300' : 'text-zinc-500 group-hover:text-zinc-300'}
               />
-              {item.label}
+              <span className="flex-1 text-left truncate">{item.label}</span>
+              {item.kbd && !isActive && (
+                <kbd className="text-[9px] text-zinc-600 bg-zinc-800/80 border border-zinc-700 px-1 py-0.5 rounded opacity-60 group-hover:opacity-100 transition-opacity">{item.kbd}</kbd>
+              )}
             </button>
           );
         })}

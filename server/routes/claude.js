@@ -363,4 +363,226 @@ router.post('/reformulate', async (req, res) => {
   res.json({ message: 'Module Reformulation — coming in step 9' });
 });
 
+// ─── Helpers for iteration ────────────────────────────────────────────────────
+function modifyHtmlText(html, replacements) {
+  let modified = html;
+  for (const { from, to } of replacements) {
+    if (from && to && from !== to && from.trim().length > 2) {
+      modified = modified.split(from).join(to);
+    }
+  }
+  return modified;
+}
+
+function modifyHtmlColors(html, colorMap) {
+  let modified = html;
+  for (const [from, to] of Object.entries(colorMap)) {
+    if (!from || !to || from === to) continue;
+    modified = modified.split(from.toLowerCase()).join(to.toLowerCase());
+    modified = modified.split(from.toUpperCase()).join(to.toUpperCase());
+  }
+  return modified;
+}
+
+function buildProductCtxShort(product) {
+  if (!product) return 'Produit non défini';
+  return [
+    `Nom : ${product.name || '?'}`,
+    product.brand ? `Marque : ${product.brand}` : '',
+    product.benefits?.filter(Boolean).length
+      ? `Bénéfices : ${product.benefits.filter(Boolean).slice(0, 3).join(' • ')}`
+      : '',
+    product.price ? `Prix : ${product.price}€` : '',
+  ].filter(Boolean).join('\n');
+}
+
+function buildPersonaCtxShort(persona) {
+  if (!persona) return 'Pas de persona défini';
+  const pains = [...(persona.pain_points || [])].sort((a, b) => (b.intensity || 0) - (a.intensity || 0));
+  return [
+    `Nom : ${persona.name}`,
+    persona.demographics
+      ? `Profil : ${[persona.demographics.age, persona.demographics.gender].filter(Boolean).join(', ')}`
+      : '',
+    pains.slice(0, 4).length
+      ? `Pain points :\n${pains.slice(0, 4).map((p, i) => `  ${i + 1}. [${p.intensity}/5] ${p.text}`).join('\n')}`
+      : '',
+    persona.awareness_level ? `Niveau de conscience : ${persona.awareness_level}` : '',
+    persona.tone ? `Ton : ${persona.tone}` : '',
+  ].filter(Boolean).join('\n');
+}
+
+// ─── Generate iteration variants ──────────────────────────────────────────────
+router.post('/generate-iterate', async (req, res) => {
+  try {
+    const { baseContent, product, persona, variable, strategy, count = 5, baseHtml } = req.body;
+    if (!variable) return res.status(400).json({ error: 'variable required' });
+
+    const productCtx = buildProductCtxShort(product);
+    const personaCtx = buildPersonaCtxShort(persona);
+    let variants = [];
+
+    if (variable === 'headline') {
+      const strategyMap = {
+        pain_points_differents: `Génère ${count} headlines en ciblant un PAIN POINT DIFFÉRENT pour chaque headline.`,
+        formulations: `Génère ${count} FORMULATIONS DIFFÉRENTES du même pain point principal (question / affirmation / chiffre / interpellation directe / témoignage).`,
+        niveaux_conscience: `Génère ${count} headlines adaptés à des NIVEAUX DE CONSCIENCE DIFFÉRENTS : unaware → problem_aware → solution_aware → product_aware → most_aware.`,
+        mix_auto: `Génère ${count} headlines en choisissant librement les meilleures combinaisons de pain points et formulations.`,
+      };
+
+      const SYSTEM = `Tu es un expert en copywriting direct-response pour Facebook et Instagram Ads. Tu génères des headlines A/B testables, percutants et adaptés au persona cible.`;
+      const PROMPT = `${strategyMap[strategy] || strategyMap.mix_auto}
+
+PRODUIT :
+${productCtx}
+
+PERSONA :
+${personaCtx}
+
+HEADLINE CONTRÔLE (à battre) : "${baseContent?.headline || ''}"
+SOUS-HEADLINE CONTRÔLE : "${baseContent?.subheadline || ''}"
+
+RÈGLES :
+- Headlines courts et percutants (5-10 mots max)
+- 100% en français
+- Chaque headline clairement différent des autres
+
+Réponds UNIQUEMENT avec un tableau JSON :
+[{ "headline": "", "subheadline": "", "angle": "", "pain_point_source": "", "rationale": "" }]`;
+
+      const raw = await chat(SYSTEM, PROMPT, { maxTokens: 2500 });
+      const parsed = parseJSON(raw);
+      variants = (Array.isArray(parsed) ? parsed : []).slice(0, count).map((v, i) => ({
+        id: `v${i + 1}`,
+        label: v.angle || `Variante ${i + 1}`,
+        content: { headline: v.headline, subheadline: v.subheadline, angle: v.angle, pain_point_source: v.pain_point_source },
+        rationale: v.rationale,
+        changes: { variable: 'headline', highlight: 'headline', value: v.headline },
+        html: baseHtml ? modifyHtmlText(baseHtml, [
+          { from: baseContent?.headline, to: v.headline },
+          { from: baseContent?.subheadline, to: v.subheadline },
+        ]) : null,
+      }));
+    }
+
+    else if (variable === 'colors') {
+      const baseColors = baseContent?.colors || {};
+      const SYSTEM = `Tu es un expert en direction artistique pour publicité digitale. Tu génères des palettes de couleurs contrastées et psychologiquement adaptées au persona.`;
+      const PROMPT = `Génère exactement ${count} palettes de couleurs distinctes.
+
+PERSONA : ${personaCtx}
+PRODUIT : ${productCtx}
+PALETTE CONTRÔLE : fond=${baseColors.background || '#1a1a2e'}, texte=${baseColors.text || '#ffffff'}, CTA=${baseColors.cta || '#e94560'}
+
+Génère : fond sombre / fond clair / couleur vive / monochrome / couleurs persona / contraste maximal / premium / urgence (jusqu'à ${count}).
+
+Réponds UNIQUEMENT avec un tableau JSON :
+[{ "name": "", "background": "#hex", "text": "#hex", "text_secondary": "#hex", "cta_bg": "#hex", "cta_text": "#hex", "accent": "#hex", "rationale": "" }]`;
+
+      const raw = await chat(SYSTEM, PROMPT, { maxTokens: 2000 });
+      const parsed = parseJSON(raw);
+      variants = (Array.isArray(parsed) ? parsed : []).slice(0, count).map((v, i) => {
+        const colorMap = {};
+        if (baseColors.background && v.background) colorMap[baseColors.background] = v.background;
+        if (baseColors.text && v.text) colorMap[baseColors.text] = v.text;
+        if (baseColors.cta && v.cta_bg) colorMap[baseColors.cta] = v.cta_bg;
+        return {
+          id: `v${i + 1}`,
+          label: v.name || `Palette ${i + 1}`,
+          content: { colors: { background: v.background, text: v.text, cta: v.cta_bg, accent: v.accent } },
+          rationale: v.rationale,
+          changes: { variable: 'colors', highlight: 'colors', palette: v },
+          html: (baseHtml && Object.keys(colorMap).length) ? modifyHtmlColors(baseHtml, colorMap) : baseHtml,
+        };
+      });
+    }
+
+    else if (variable === 'angle') {
+      const SYSTEM = `Tu es un expert en copywriting direct-response. Tu génères des variantes d'angles marketing ciblant différents bénéfices/pain points.`;
+      const PROMPT = `Génère ${count} angles marketing distincts.
+
+PRODUIT : ${productCtx}
+PERSONA : ${personaCtx}
+ANGLE CONTRÔLE : "${baseContent?.angle || ''}"
+HEADLINE CONTRÔLE : "${baseContent?.headline || ''}"
+
+Chaque angle cible un bénéfice ou pain point DIFFÉRENT. Génère headline + sous-headline adapté.
+
+Réponds UNIQUEMENT avec un tableau JSON :
+[{ "angle": "", "angle_label": "", "pain_point_source": "", "headline": "", "subheadline": "", "cta_text": "", "rationale": "" }]`;
+
+      const raw = await chat(SYSTEM, PROMPT, { maxTokens: 2500 });
+      const parsed = parseJSON(raw);
+      variants = (Array.isArray(parsed) ? parsed : []).slice(0, count).map((v, i) => ({
+        id: `v${i + 1}`,
+        label: v.angle_label || v.angle || `Angle ${i + 1}`,
+        content: { headline: v.headline, subheadline: v.subheadline, angle: v.angle, cta: v.cta_text, pain_point_source: v.pain_point_source },
+        rationale: v.rationale,
+        changes: { variable: 'angle', highlight: 'angle', value: v.angle_label || v.angle, pain_point: v.pain_point_source },
+        html: baseHtml ? modifyHtmlText(baseHtml, [
+          { from: baseContent?.headline, to: v.headline },
+          { from: baseContent?.subheadline, to: v.subheadline },
+        ]) : null,
+      }));
+    }
+
+    else if (variable === 'structure') {
+      const SYSTEM = `Tu es un expert en direction artistique pour publicité digitale.`;
+      const PROMPT = `Génère ${count} variations de structure/layout.
+
+PRODUIT : ${productCtx}
+STRUCTURE CONTRÔLE : ${baseContent?.structure || 'hero-centré'}
+
+Structures : miroir / hero centré / split 50/50 / produit dominant / texte dominant / grille bénéfices (jusqu'à ${count}).
+
+Réponds UNIQUEMENT avec un tableau JSON :
+[{ "structure": "", "structure_label": "", "description": "", "rationale": "" }]`;
+
+      const raw = await chat(SYSTEM, PROMPT, { maxTokens: 1500 });
+      const parsed = parseJSON(raw);
+      variants = (Array.isArray(parsed) ? parsed : []).slice(0, count).map((v, i) => ({
+        id: `v${i + 1}`,
+        label: v.structure_label || `Structure ${i + 1}`,
+        content: { structure: v.structure, description: v.description },
+        rationale: v.rationale,
+        changes: { variable: 'structure', highlight: 'structure', value: v.structure_label },
+        html: null,
+        note: 'La modification de structure nécessite une régénération complète.',
+      }));
+    }
+
+    else if (variable === 'cta') {
+      const SYSTEM = `Tu es un expert en copywriting direct-response. Tu génères des variantes de CTA et d'éléments secondaires pour maximiser le CTR.`;
+      const PROMPT = `Génère ${count} variantes de CTA et éléments secondaires.
+
+PRODUIT : ${productCtx}
+PERSONA : ${personaCtx}
+CTA CONTRÔLE : "${baseContent?.cta || 'Découvrir maintenant'}"
+BADGE CONTRÔLE : "${baseContent?.badge || ''}"
+
+Réponds UNIQUEMENT avec un tableau JSON :
+[{ "cta_text": "", "badge_text": "", "social_proof": "", "guarantee": "", "rationale": "" }]`;
+
+      const raw = await chat(SYSTEM, PROMPT, { maxTokens: 1500 });
+      const parsed = parseJSON(raw);
+      variants = (Array.isArray(parsed) ? parsed : []).slice(0, count).map((v, i) => ({
+        id: `v${i + 1}`,
+        label: `CTA: "${v.cta_text}"`,
+        content: { cta: v.cta_text, badge: v.badge_text, social_proof: v.social_proof, guarantee: v.guarantee },
+        rationale: v.rationale,
+        changes: { variable: 'cta', highlight: 'cta', value: v.cta_text },
+        html: baseHtml ? modifyHtmlText(baseHtml, [
+          { from: baseContent?.cta, to: v.cta_text },
+          { from: baseContent?.badge, to: v.badge_text },
+        ]) : null,
+      }));
+    }
+
+    res.json({ success: true, variants });
+  } catch (err) {
+    console.error('generate-iterate error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;

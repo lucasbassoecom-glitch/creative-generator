@@ -5,16 +5,25 @@ import {
   BookImage, Search, Trash2, Star, Eye, Filter, X,
   CheckCircle2, Clock, Archive, FileCode, Loader2,
   ChevronDown, Sparkles, LayoutTemplate, Monitor,
-  Smartphone, Square,
+  Smartphone, Square, BarChart2, RefreshCw,
 } from 'lucide-react';
 import { getFormatById, FORMAT_CATEGORIES } from '../utils/formats';
 import CreativeCanvas from '../components/Canvas/CreativeCanvas';
+import FeedbackModal from '../components/Common/FeedbackModal';
 
 // ─── Status config ─────────────────────────────────────────────────────────
 const STATUS_CFG = {
   draft:     { label: 'Brouillon', icon: Clock,        color: 'text-zinc-400',   bg: 'bg-zinc-800',       dot: 'bg-zinc-500' },
   published: { label: 'Publié',    icon: CheckCircle2,  color: 'text-emerald-400', bg: 'bg-emerald-900/30', dot: 'bg-emerald-500' },
   archived:  { label: 'Archivé',   icon: Archive,       color: 'text-amber-400',   bg: 'bg-amber-900/30',   dot: 'bg-amber-500' },
+};
+
+const PERF_STATUS_CFG = {
+  winner:      { label: '🏆 Winner',    dot: 'bg-yellow-400' },
+  potential:   { label: '⚡ Potentiel', dot: 'bg-blue-400' },
+  loser:       { label: '❌ Loser',     dot: 'bg-red-400' },
+  testing:     { label: '⏳ En test',   dot: 'bg-amber-400' },
+  not_launched:{ label: '🚫 Pas lancé', dot: 'bg-zinc-600' },
 };
 
 function FormatMini({ formatId }) {
@@ -63,7 +72,7 @@ function PreviewModal({ creative, onClose }) {
 }
 
 // ─── Creative card ──────────────────────────────────────────────────────────
-function CreativeCard({ creative, onFavorite, onDelete, onStatusChange, onPreview, onExport }) {
+function CreativeCard({ creative, onFavorite, onDelete, onStatusChange, onPreview, onExport, onFeedback, onIterate }) {
   const status = STATUS_CFG[creative.status] || STATUS_CFG.draft;
   const format = getFormatById(creative.formatId);
   const thumbScale = format ? (128 / format.height) : 0.1;
@@ -115,6 +124,8 @@ function CreativeCard({ creative, onFavorite, onDelete, onStatusChange, onPrevie
             <FormatMini formatId={creative.formatId} />
           </div>
           <div className="flex items-center gap-0.5 shrink-0 z-10">
+            <button onClick={() => onFeedback(creative)} title="Résultats" className="p-1.5 rounded hover:bg-zinc-800 text-zinc-600 hover:text-emerald-400 transition-all"><BarChart2 size={11} /></button>
+            <button onClick={() => onIterate(creative)} title="Itérer" className="p-1.5 rounded hover:bg-zinc-800 text-zinc-600 hover:text-violet-400 transition-all"><RefreshCw size={11} /></button>
             <button onClick={() => onExport(creative)} title="Export HTML" className="p-1.5 rounded hover:bg-zinc-800 text-zinc-600 hover:text-zinc-300 transition-all"><FileCode size={11} /></button>
             <button onClick={() => onDelete(creative.id)} title="Supprimer" className="p-1.5 rounded hover:bg-zinc-800 text-zinc-600 hover:text-red-400 transition-all"><Trash2 size={11} /></button>
           </div>
@@ -139,6 +150,14 @@ function CreativeCard({ creative, onFavorite, onDelete, onStatusChange, onPrevie
             })}
           </div>
         </div>
+
+        {creative.performance?.status && PERF_STATUS_CFG[creative.performance.status] && (
+          <div className="flex items-center gap-1 mt-1.5">
+            <div className={`w-1.5 h-1.5 rounded-full ${PERF_STATUS_CFG[creative.performance.status].dot}`} />
+            <span className="text-[9px] text-zinc-500">{PERF_STATUS_CFG[creative.performance.status].label}</span>
+            {creative.performance?.ctr && <span className="text-[9px] text-zinc-500 ml-1">CTR {creative.performance.ctr}%</span>}
+          </div>
+        )}
 
         {creative.tags?.length > 0 && (
           <div className="flex flex-wrap gap-1 mt-2">
@@ -172,6 +191,7 @@ export default function LibraryPage({ onNavigate }) {
   const [products, setProducts] = useState([]);
   const [personas, setPersonas] = useState([]);
   const [preview, setPreview] = useState(null);
+  const [feedbackCreative, setFeedbackCreative] = useState(null);
 
   const [search, setSearch] = useState('');
   const [filterProduct, setFilterProduct] = useState('');
@@ -221,6 +241,16 @@ export default function LibraryPage({ onNavigate }) {
 
   const handleStatusChange = async (creative, status) => {
     try { const { data } = await axios.put(`/api/creatives/${creative.id}`, { status }); setCreatives(p => p.map(x => x.id === creative.id ? data : x)); toast.success(`→ ${STATUS_CFG[status].label}`); } catch { toast.error('Erreur'); }
+  };
+
+  const handleFeedbackSaved = (updated) => {
+    setCreatives(prev => prev.map(c => c.id === (updated?.id || feedbackCreative?.id) ? { ...c, ...updated } : c));
+    setFeedbackCreative(null);
+    toast.success('Résultats enregistrés');
+  };
+
+  const handleIterate = (creative) => {
+    onNavigate?.('iterate');
   };
 
   const handleExport = async (creative) => {
@@ -330,6 +360,8 @@ export default function LibraryPage({ onNavigate }) {
                   onFavorite={handleFavorite} onDelete={handleDelete}
                   onStatusChange={handleStatusChange} onPreview={setPreview}
                   onExport={handleExport}
+                  onFeedback={setFeedbackCreative}
+                  onIterate={handleIterate}
                 />
               ))}
             </div>
@@ -338,6 +370,13 @@ export default function LibraryPage({ onNavigate }) {
       </div>
 
       {preview && <PreviewModal creative={preview} onClose={() => setPreview(null)} />}
+      {feedbackCreative && (
+        <FeedbackModal
+          creative={feedbackCreative}
+          onClose={() => setFeedbackCreative(null)}
+          onSaved={handleFeedbackSaved}
+        />
+      )}
     </div>
   );
 }

@@ -13,6 +13,9 @@ import LibraryPage from './pages/LibraryPage';
 import BatchPage from './pages/BatchPage';
 import FormatPage from './pages/FormatPage';
 import AICreatorPage from './pages/AICreatorPage';
+import IteratePage from './pages/IteratePage';
+import AnalyticsPage from './pages/AnalyticsPage';
+import QuickSessionPage from './pages/QuickSessionPage';
 
 const PAGES = {
   dashboard: Dashboard,
@@ -24,6 +27,9 @@ const PAGES = {
   batch: BatchPage,
   formats: FormatPage,
   'ai-creator': AICreatorPage,
+  iterate: IteratePage,
+  analytics: AnalyticsPage,
+  'quick-session': QuickSessionPage,
 };
 
 export default function App() {
@@ -35,6 +41,23 @@ export default function App() {
       .then(r => r.json())
       .then(setApiStatus)
       .catch(() => setApiStatus({ status: 'error' }));
+  }, []);
+
+  // Global keyboard shortcuts
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      switch (e.key.toLowerCase()) {
+        case 'n': setCurrentPage('ai-creator'); break;
+        case 'i': setCurrentPage('iterate'); break;
+        case 's': setCurrentPage('quick-session'); break;
+        case 'a': setCurrentPage('analytics'); break;
+        default: break;
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
   }, []);
 
   const PageComponent = PAGES[currentPage] || Dashboard;

@@ -29,6 +29,7 @@ app.use('/api/claude', require('./routes/claude'));
 app.use('/api/export', require('./routes/export'));
 app.use('/api/upload', require('./routes/upload'));
 app.use('/api/gpt-images', require('./routes/gpt-images'));
+app.use('/api/analytics', require('./routes/analytics'));
 
 // Health check
 app.get('/api/health', (req, res) => {
