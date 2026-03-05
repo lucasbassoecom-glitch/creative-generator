@@ -192,6 +192,8 @@ function VariantCard({ variant, isControl, variable, onFavorite, onFeedback, ind
               }}
             />
           </div>
+        ) : variant.imageBase64 ? (
+          <img src={variant.imageBase64} alt="" className="w-full h-full object-cover" />
         ) : variant.imagePath ? (
           <img src={`http://localhost:3001${variant.imagePath}`} alt="" className="w-full h-full object-cover" />
         ) : (
@@ -296,6 +298,8 @@ export default function IteratePage({ onNavigate }) {
   const [step, setStep] = useState(1); // 1: select, 2: configure, 3: results
   const [baseCreative, setBaseCreative] = useState(null);
   const [showSelectModal, setShowSelectModal] = useState(false);
+  const [uploadAnalyzing, setUploadAnalyzing] = useState(false);
+  const uploadInputRef = useRef(null);
   const [selectedVariable, setSelectedVariable] = useState(null);
   const [selectedStrategy, setSelectedStrategy] = useState('mix_auto');
   const [count, setCount] = useState(DEFAULT_COUNT);
@@ -352,6 +356,7 @@ export default function IteratePage({ onNavigate }) {
         content: baseCreative.content || { headline: baseCreative.name },
         html: baseCreative.html || null,
         imagePath: baseCreative.imagePath || null,
+        imageBase64: baseCreative.imageBase64 || null,
         formatId: baseCreative.formatId || baseCreative.format,
         changes: { variable: selectedVariable, value: 'Contrôle' },
         rationale: 'Créative de référence — toujours en position 1.',
@@ -365,6 +370,73 @@ export default function IteratePage({ onNavigate }) {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleUpload = async (file) => {
+    if (!file) return;
+    const allowed = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+    if (!allowed.includes(file.type)) return toast.error('Format non supporté (JPG, PNG, WEBP)');
+
+    setUploadAnalyzing(true);
+    try {
+      // Convert to base64
+      const reader = new FileReader();
+      const base64 = await new Promise((resolve, reject) => {
+        reader.onload = () => resolve(reader.result.split(',')[1]);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+
+      // Analyze via Claude Vision
+      const { data } = await axios.post('/api/claude/analyze', {
+        imageBase64: base64,
+        mediaType: file.type,
+      });
+      if (!data.success) throw new Error(data.error);
+
+      const analysis = data.analysis;
+      const headline = analysis.typography?.find(t => t.type === 'headline')?.content || '';
+      const subheadline = analysis.typography?.find(t => t.type === 'subheadline')?.content || '';
+      const ctaText = analysis.cta?.text || '';
+
+      // Build a synthetic creative from the analysis
+      const synthetic = {
+        id: `upload_${Date.now()}`,
+        name: file.name.replace(/\.[^.]+$/, ''),
+        isUploaded: true,
+        imageBase64: `data:${file.type};base64,${base64}`,
+        content: {
+          headline,
+          subheadline,
+          cta: ctaText,
+          angle: analysis.copywriting_angle || '',
+          structure: analysis.layout?.composition || 'hero-centré',
+          colors: {
+            background: analysis.background?.color || analysis.colors?.dominant?.[0] || '',
+            text: analysis.typography?.find(t => t.type === 'headline')?.color || '#ffffff',
+            cta: analysis.cta?.color || '',
+          },
+          copy_framework: analysis.copy_framework?.name || '',
+          badges: analysis.persuasion_elements?.map(e => e.description).slice(0, 2) || [],
+        },
+        analysis,
+        html: null,
+      };
+
+      setBaseCreative(synthetic);
+      setStep(2);
+      toast.success('Image analysée — créative prête');
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Erreur lors de l\'analyse');
+    } finally {
+      setUploadAnalyzing(false);
+    }
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    const file = e.dataTransfer.files[0];
+    if (file) handleUpload(file);
   };
 
   const varCfg = VARIABLES.find(v => v.id === selectedVariable);
@@ -399,19 +471,60 @@ export default function IteratePage({ onNavigate }) {
               </div>
 
               {!baseCreative ? (
-                <div className="flex gap-3">
+                <div className="grid grid-cols-2 gap-3">
+                  {/* Option 1 : Upload */}
+                  <div
+                    onDrop={handleDrop}
+                    onDragOver={e => e.preventDefault()}
+                    className="relative flex flex-col items-center justify-center gap-3 p-6 border-2 border-dashed border-zinc-700 hover:border-violet-500 rounded-xl text-zinc-400 hover:text-violet-300 transition-all group cursor-pointer"
+                    onClick={() => uploadInputRef.current?.click()}
+                  >
+                    <input
+                      ref={uploadInputRef}
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      className="hidden"
+                      onChange={e => handleUpload(e.target.files[0])}
+                    />
+                    {uploadAnalyzing ? (
+                      <>
+                        <Loader2 size={22} className="animate-spin text-violet-400" />
+                        <span className="text-xs font-semibold text-violet-300">Analyse en cours…</span>
+                      </>
+                    ) : (
+                      <>
+                        <div className="w-10 h-10 rounded-xl bg-zinc-800 group-hover:bg-violet-900/40 flex items-center justify-center transition-colors">
+                          <Upload size={18} className="group-hover:text-violet-400 transition-colors" />
+                        </div>
+                        <div className="text-center">
+                          <div className="text-sm font-semibold">Uploader une image</div>
+                          <div className="text-[10px] text-zinc-600 mt-0.5">Drag & drop ou clic · JPG, PNG, WEBP</div>
+                          <div className="text-[10px] text-violet-600 mt-1">Analyse Claude auto</div>
+                        </div>
+                      </>
+                    )}
+                  </div>
+
+                  {/* Option 2 : Bibliothèque */}
                   <button
                     onClick={() => setShowSelectModal(true)}
-                    className="flex-1 flex items-center justify-center gap-2 p-4 border-2 border-dashed border-zinc-700 hover:border-indigo-500 rounded-xl text-zinc-400 hover:text-indigo-300 transition-all"
+                    className="flex flex-col items-center justify-center gap-3 p-6 border-2 border-dashed border-zinc-700 hover:border-indigo-500 rounded-xl text-zinc-400 hover:text-indigo-300 transition-all group"
                   >
-                    <BookImage size={18} />
-                    <span className="text-sm">Choisir dans la bibliothèque</span>
+                    <div className="w-10 h-10 rounded-xl bg-zinc-800 group-hover:bg-indigo-900/40 flex items-center justify-center transition-colors">
+                      <BookImage size={18} className="group-hover:text-indigo-400 transition-colors" />
+                    </div>
+                    <div className="text-center">
+                      <div className="text-sm font-semibold">Bibliothèque</div>
+                      <div className="text-[10px] text-zinc-600 mt-0.5">Créatives existantes</div>
+                    </div>
                   </button>
                 </div>
               ) : (
                 <div className="flex items-center gap-3 p-4 bg-zinc-900 border border-indigo-500/40 rounded-xl">
                   <div className="w-12 h-12 bg-zinc-800 rounded-lg flex items-center justify-center shrink-0 overflow-hidden">
-                    {baseCreative.imagePath
+                    {baseCreative.imageBase64
+                      ? <img src={baseCreative.imageBase64} alt="" className="w-full h-full object-cover" />
+                      : baseCreative.imagePath
                       ? <img src={`http://localhost:3001${baseCreative.imagePath}`} alt="" className="w-full h-full object-cover" />
                       : <BookImage size={18} className="text-zinc-600" />}
                   </div>
