@@ -4,7 +4,7 @@ import toast from 'react-hot-toast';
 import {
   RefreshCw, Loader2, ChevronLeft, ChevronRight, AlertCircle,
   BookImage, X, Check, Download, Star, BarChart2, Info,
-  ArrowLeft, Upload, Eye, Zap,
+  ArrowLeft, Upload, Eye, Zap, Users, Package,
 } from 'lucide-react';
 import { getFormatById } from '../utils/formats';
 import { usePersona } from '../context/PersonaContext';
@@ -293,13 +293,21 @@ function VariantCard({ variant, isControl, variable, onFavorite, onFeedback, ind
 export default function IteratePage({ onNavigate }) {
   const { activePersonas } = usePersona();
   const { activeProduct } = useProduct();
-  const persona = activePersonas[0] || null;
 
   const [step, setStep] = useState(1); // 1: select, 2: configure, 3: results
   const [baseCreative, setBaseCreative] = useState(null);
   const [showSelectModal, setShowSelectModal] = useState(false);
   const [uploadAnalyzing, setUploadAnalyzing] = useState(false);
   const uploadInputRef = useRef(null);
+
+  // Personas & products from library
+  const [allPersonas, setAllPersonas] = useState([]);
+  const [allProducts, setAllProducts] = useState([]);
+  const [selectedPersona, setSelectedPersona] = useState(null);
+  const [selectedProduct, setSelectedProduct] = useState(null);
+  const [showPersonaList, setShowPersonaList] = useState(false);
+  const [showProductList, setShowProductList] = useState(false);
+
   const [selectedVariable, setSelectedVariable] = useState(null);
   const [selectedStrategy, setSelectedStrategy] = useState('mix_auto');
   const [count, setCount] = useState(DEFAULT_COUNT);
@@ -307,6 +315,31 @@ export default function IteratePage({ onNavigate }) {
   const [variants, setVariants] = useState([]);
   const [feedbackCreative, setFeedbackCreative] = useState(null);
   const scrollRef = useRef(null);
+
+  // Fetch personas & products, auto-select if only one exists
+  useEffect(() => {
+    Promise.all([axios.get('/api/personas'), axios.get('/api/products')])
+      .then(([{ data: ps }, { data: prods }]) => {
+        setAllPersonas(ps);
+        setAllProducts(prods);
+        if (ps.length === 1) setSelectedPersona(ps[0]);
+        if (prods.length === 1) setSelectedProduct(prods[0]);
+      })
+      .catch(() => {});
+  }, []);
+
+  // When base creative changes, pre-select its persona/product
+  useEffect(() => {
+    if (!baseCreative) return;
+    if (baseCreative.personaId && allPersonas.length > 0) {
+      const match = allPersonas.find(p => p.id === baseCreative.personaId);
+      if (match) setSelectedPersona(match);
+    }
+    if (baseCreative.productId && allProducts.length > 0) {
+      const match = allProducts.find(p => p.id === baseCreative.productId);
+      if (match) setSelectedProduct(match);
+    }
+  }, [baseCreative, allPersonas, allProducts]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -323,12 +356,13 @@ export default function IteratePage({ onNavigate }) {
   }, [step, selectedVariable, loading]);
 
   const handleGenerate = async () => {
-    if (!selectedVariable) return toast.error('Sélectionne une variable à tester');
     if (!baseCreative) return toast.error('Sélectionne une créative de base');
+    if (!selectedPersona) return toast.error('Sélectionne un persona');
+    if (!selectedProduct) return toast.error('Sélectionne un produit');
+    if (!selectedVariable) return toast.error('Sélectionne une variable à tester');
 
     setLoading(true);
     try {
-      const product = activeProduct || null;
       const payload = {
         baseContent: baseCreative.content || {
           headline: baseCreative.name,
@@ -338,8 +372,8 @@ export default function IteratePage({ onNavigate }) {
           colors: {},
           structure: 'hero-centré',
         },
-        product,
-        persona,
+        product: selectedProduct,
+        persona: selectedPersona,
         variable: selectedVariable,
         strategy: selectedStrategy,
         count,
@@ -543,14 +577,122 @@ export default function IteratePage({ onNavigate }) {
               )}
             </div>
 
-            {/* Step 2: Variable */}
-            <div>
+            {/* Step 2: Persona + Produit */}
+            <div className="mb-8">
               <div className="flex items-center gap-2 mb-3">
                 <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black ${baseCreative ? 'bg-indigo-600 text-white' : 'bg-zinc-800 text-zinc-500'}`}>2</div>
-                <span className={`text-sm font-semibold ${baseCreative ? 'text-zinc-200' : 'text-zinc-600'}`}>Choisir la variable à tester</span>
+                <span className={`text-sm font-semibold ${baseCreative ? 'text-zinc-200' : 'text-zinc-600'}`}>Persona & Produit</span>
               </div>
 
               {baseCreative && (
+                <div className="grid grid-cols-2 gap-3">
+                  {/* Persona selector */}
+                  <div className="relative">
+                    <button
+                      onClick={() => { setShowPersonaList(v => !v); setShowProductList(false); }}
+                      className={`w-full flex items-center gap-3 p-3.5 rounded-xl border text-left transition-all ${
+                        selectedPersona
+                          ? 'border-indigo-500/50 bg-indigo-900/10'
+                          : 'border-dashed border-zinc-700 hover:border-indigo-500/50'
+                      }`}
+                    >
+                      <div className="w-8 h-8 rounded-lg bg-blue-900/40 border border-blue-800/40 flex items-center justify-center shrink-0">
+                        <Users size={14} className="text-blue-400" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        {selectedPersona ? (
+                          <>
+                            <div className="text-[10px] text-zinc-500 leading-none mb-0.5">Persona <span className="text-red-500">*</span></div>
+                            <div className="text-xs font-semibold text-zinc-200 truncate">{selectedPersona.name}</div>
+                          </>
+                        ) : (
+                          <>
+                            <div className="text-[10px] text-zinc-500 leading-none mb-0.5">Persona <span className="text-red-500">*</span></div>
+                            <div className="text-xs text-zinc-500">Sélectionner…</div>
+                          </>
+                        )}
+                      </div>
+                      {selectedPersona
+                        ? <Check size={12} className="text-indigo-400 shrink-0" />
+                        : <ChevronRight size={12} className="text-zinc-600 shrink-0" />}
+                    </button>
+
+                    {showPersonaList && (
+                      <div className="absolute top-full left-0 right-0 mt-1 z-30 bg-zinc-900 border border-zinc-700 rounded-xl overflow-hidden shadow-2xl max-h-52 overflow-y-auto">
+                        {allPersonas.length === 0 ? (
+                          <div className="px-3 py-4 text-xs text-zinc-500 text-center">Aucun persona — crée-en un d'abord</div>
+                        ) : allPersonas.map(p => (
+                          <button key={p.id} onClick={() => { setSelectedPersona(p); setShowPersonaList(false); }}
+                            className={`w-full flex items-center gap-2 px-3 py-2.5 text-xs hover:bg-zinc-800 transition-colors text-left ${selectedPersona?.id === p.id ? 'bg-indigo-900/20 text-indigo-300 font-semibold' : 'text-zinc-300'}`}>
+                            <Users size={11} className="text-blue-400 shrink-0" />
+                            <span className="truncate">{p.name}</span>
+                            {p.demographics?.age && <span className="text-zinc-600 ml-auto shrink-0">{p.demographics.age}</span>}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Produit selector */}
+                  <div className="relative">
+                    <button
+                      onClick={() => { setShowProductList(v => !v); setShowPersonaList(false); }}
+                      className={`w-full flex items-center gap-3 p-3.5 rounded-xl border text-left transition-all ${
+                        selectedProduct
+                          ? 'border-emerald-500/50 bg-emerald-900/10'
+                          : 'border-dashed border-zinc-700 hover:border-emerald-500/50'
+                      }`}
+                    >
+                      <div className="w-8 h-8 rounded-lg bg-emerald-900/40 border border-emerald-800/40 flex items-center justify-center shrink-0 overflow-hidden">
+                        {selectedProduct?.packshot
+                          ? <img src={selectedProduct.packshot} alt="" className="w-full h-full object-contain" />
+                          : <Package size={14} className="text-emerald-400" />}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        {selectedProduct ? (
+                          <>
+                            <div className="text-[10px] text-zinc-500 leading-none mb-0.5">Produit <span className="text-red-500">*</span></div>
+                            <div className="text-xs font-semibold text-zinc-200 truncate">{selectedProduct.name}</div>
+                          </>
+                        ) : (
+                          <>
+                            <div className="text-[10px] text-zinc-500 leading-none mb-0.5">Produit <span className="text-red-500">*</span></div>
+                            <div className="text-xs text-zinc-500">Sélectionner…</div>
+                          </>
+                        )}
+                      </div>
+                      {selectedProduct
+                        ? <Check size={12} className="text-emerald-400 shrink-0" />
+                        : <ChevronRight size={12} className="text-zinc-600 shrink-0" />}
+                    </button>
+
+                    {showProductList && (
+                      <div className="absolute top-full left-0 right-0 mt-1 z-30 bg-zinc-900 border border-zinc-700 rounded-xl overflow-hidden shadow-2xl max-h-52 overflow-y-auto">
+                        {allProducts.length === 0 ? (
+                          <div className="px-3 py-4 text-xs text-zinc-500 text-center">Aucun produit — crée-en un d'abord</div>
+                        ) : allProducts.map(p => (
+                          <button key={p.id} onClick={() => { setSelectedProduct(p); setShowProductList(false); }}
+                            className={`w-full flex items-center gap-2 px-3 py-2.5 text-xs hover:bg-zinc-800 transition-colors text-left ${selectedProduct?.id === p.id ? 'bg-emerald-900/20 text-emerald-300 font-semibold' : 'text-zinc-300'}`}>
+                            <Package size={11} className="text-emerald-400 shrink-0" />
+                            <span className="truncate">{p.name}</span>
+                            {p.price && <span className="text-zinc-600 ml-auto shrink-0">{p.price}€</span>}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Step 3: Variable */}
+            <div>
+              <div className="flex items-center gap-2 mb-3">
+                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black ${selectedPersona && selectedProduct ? 'bg-indigo-600 text-white' : 'bg-zinc-800 text-zinc-500'}`}>3</div>
+                <span className={`text-sm font-semibold ${selectedPersona && selectedProduct ? 'text-zinc-200' : 'text-zinc-600'}`}>Choisir la variable à tester</span>
+              </div>
+
+              {baseCreative && selectedPersona && selectedProduct && (
                 <>
                   <div className="text-[10px] text-amber-400/80 mb-3 flex items-center gap-1.5 bg-amber-900/10 border border-amber-900/30 rounded-lg px-3 py-2">
                     <AlertCircle size={11} />
@@ -621,21 +763,30 @@ export default function IteratePage({ onNavigate }) {
                     </div>
                   )}
 
-                  <button
-                    onClick={handleGenerate}
-                    disabled={!selectedVariable || loading}
-                    className={`w-full flex items-center justify-center gap-2 py-3.5 rounded-xl text-sm font-bold transition-all ${
-                      selectedVariable && !loading
-                        ? 'bg-violet-600 hover:bg-violet-500 text-white shadow-lg shadow-violet-900/30'
-                        : 'bg-zinc-800 text-zinc-600 cursor-not-allowed'
-                    }`}
-                  >
-                    {loading ? (
-                      <><Loader2 size={16} className="animate-spin" /> Génération en cours…</>
-                    ) : (
-                      <><Zap size={16} /> Générer {count} variantes — {selectedVariable ? VARIABLES.find(v => v.id === selectedVariable)?.icon : ''}</>
-                    )}
-                  </button>
+                  {(() => {
+                    const ready = selectedVariable && selectedPersona && selectedProduct && !loading;
+                    const missing = !selectedPersona ? 'persona' : !selectedProduct ? 'produit' : !selectedVariable ? 'variable' : null;
+                    return (
+                      <button
+                        onClick={handleGenerate}
+                        disabled={!ready}
+                        title={missing ? `Sélectionne un ${missing} pour continuer` : ''}
+                        className={`w-full flex items-center justify-center gap-2 py-3.5 rounded-xl text-sm font-bold transition-all ${
+                          ready
+                            ? 'bg-violet-600 hover:bg-violet-500 text-white shadow-lg shadow-violet-900/30'
+                            : 'bg-zinc-800 text-zinc-600 cursor-not-allowed'
+                        }`}
+                      >
+                        {loading ? (
+                          <><Loader2 size={16} className="animate-spin" /> Génération en cours…</>
+                        ) : missing ? (
+                          <><AlertCircle size={16} /> Sélectionne un {missing} pour continuer</>
+                        ) : (
+                          <><Zap size={16} /> Générer {count} variantes — {VARIABLES.find(v => v.id === selectedVariable)?.icon}</>
+                        )}
+                      </button>
+                    );
+                  })()}
                 </>
               )}
             </div>
